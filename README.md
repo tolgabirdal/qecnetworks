@@ -12,6 +12,8 @@ This repository contains the implementation of our [ECCV 2020 paper *Quaternion 
 
 For an intuitive explanation of the QEC-Net, please check out [ECCV oral presentation](https://youtu.be/LHh56snwhTA).
 
+For the source code, please visit [this github repository](https://github.com/tolgabirdal/qecnetworks).
+
 ![](https://github.com/yongheng1991/qec_net/blob/master/docs/teaser.png )
 
 
