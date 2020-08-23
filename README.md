@@ -8,9 +8,9 @@ Created by <a href="http://campar.in.tum.de/Main/YongHengZhao" target="_blank">Y
 <a href="https://profiles.stanford.edu/leonidas-guibas" target="_blank">Leonidas Guibas</a>, 
 <a href="http://campar.in.tum.de/Main/FedericoTombari" target="_blank">Federico Tombari </a>.
 
-This repository contains the implementation of our [ECCV 2020 paper *Quaternion Equivariant Capsule Networks for 3D Point Clouds*](https://arxiv.org/abs/1912.12098).(QEC-Net) In particular, we release code for training and testing QEC-Net for classification and relative rotation estimation for 3D shapes as well as the pre-trained models for quickly replicating our results. 
+This repository contains the implementation of our [ECCV 2020 paper *Quaternion Equivariant Capsule Networks for 3D Point Clouds*](https://arxiv.org/abs/1912.12098) (QEC-Net). In particular, we release code for training and testing QEC-Net for classification and relative rotation estimation for 3D shapes as well as the pre-trained models for quickly replicating our results. 
 
-For an intuitive explanation of the QEC-Net, please check out [ECCV oral presentation](to be added).
+For an intuitive explanation of the QEC-Net, please check out [ECCV oral presentation](https://youtu.be/LHh56snwhTA).
 
 ![](https://github.com/yongheng1991/qec_net/blob/master/docs/teaser.png )
 
