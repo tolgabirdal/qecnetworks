@@ -1,11 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
-Created on Tue May 21 01:05:23 2019
-"""
 
 '''
-   Generate random samples from 10k to 2K/ Genreate uniform samples from 2k to 512 to 64.
+This is used to generate multiple uniform sampled point clouds in order to accelerate training.
+The downsamples are saved as index file.
 '''
 
 import os
@@ -15,9 +13,7 @@ import numpy as np
 import sys
 import torch
 import torch.utils.data as data
-from pyquaternion import Quaternion
 from scipy.spatial import distance
-import sys
 sys.path.append('../models')
 import quat_ops
 import torch.nn.functional as F
@@ -39,7 +35,6 @@ class ModelNetDataset(data.Dataset):
        self.normalize = normalize
        self.data_aug=data_aug
        self.num_gen_samples=num_gen_samples
-
        self.catfile = os.path.join(self.root, 'modelnet'+str(num_of_class)+'_shape_names.txt')
        self.cat = [line.rstrip() for line in open(self.catfile)]
        self.classes = dict(zip(self.cat, range(len(self.cat))))
@@ -64,21 +59,12 @@ class ModelNetDataset(data.Dataset):
 
 
 
-#    def _get_item(self, index):
    def __getitem__(self, index):
-#         exists = os.path.isfile(fn[2])
-#         if not exists:
-#             return 'ds file exists'
+
        fn = self.datapath[index]
        cls = self.classes[self.datapath[index][0]]
        cls = np.array([cls]).astype(np.int32)
-#            point_normal_set = np.loadtxt(fn[1]).astype(np.float32)
        point_normal_set = np.loadtxt(fn[1], delimiter=',').astype(np.float32)
-       #lrf_set = torch.load(fn[2])
-     #  if len(self.cache) < self.cache_size:
-    #       self.cache[index] = (point_normal_set, cls)
-
-        #Init the container to keep the pooling certers and neighbours, Pool1 contatiner has 1024 ceners while Pool2 has 256. The "+1" keeps the real size of the pool1 centers.
        all_smaples_index=torch.empty(self.num_gen_samples,1024+256+1,9).long()
 
 
@@ -96,11 +82,8 @@ class ModelNetDataset(data.Dataset):
                 point_set2048=quat_ops.qrotv(rotate_q, point_set2048)
 
            choice=torch.from_numpy(choice).long()
-#           point_set2048=point_normal_set2048[:,0:3]
-
            # downsmapling:
            distance_matrix = distance.cdist(point_set2048, point_set2048, 'euclidean')
-
            diam=torch.sqrt((torch.max(point_set2048[:,0])-torch.min(point_set2048[:,0]))**2 + (torch.max(point_set2048[:,1])-torch.min(point_set2048[:,1]))**2 + (torch.max(point_set2048[:,2])-torch.min(point_set2048[:,2]))**2)
            tau_p=300
 
@@ -133,7 +116,6 @@ class ModelNetDataset(data.Dataset):
            num_of_chosen_points_pool2=0
            tau_p=tau_p*2
            tau = tau_p * diam / 10000
-#           tau_s=tau**2
 
 
            points_pool2_index=torch.zeros(256,9).long()
@@ -161,7 +143,6 @@ class ModelNetDataset(data.Dataset):
                        break
 
            points_pool2_index[num_of_chosen_points_pool2:]=-1
-#           pool2_index_4_save[num_of_chosen_points_pool2:]=-1
            pool2_index_4_save[num_of_chosen_points_pool2:]=1023
            pool1_size=num_of_chosen_points_pool1*torch.ones([1,9]).long()
            pool1_index_4_save=pool1_index_4_save[0:1024]
@@ -169,17 +150,11 @@ class ModelNetDataset(data.Dataset):
            all_smaples_index[sample_no]=torch.cat((pool1_index_4_save,pool2_index_4_save,pool1_size),dim=0)
 #           print('num_of_chosen_points_pool2',num_of_chosen_points_pool2)
        torch.save(all_smaples_index,fn[2])
-#        print(fn[2])
        return fn[2]
 
    def __len__(self):
        return len(self.datapath)
 
-   def num_channel(self):
-       if self.lrf_channel:
-           return 7
-       else:
-           return 3
 
    def calc_distances(self,p0, points):
        return ((p0 - points)**2).sum()
@@ -188,11 +163,9 @@ class ModelNetDataset(data.Dataset):
 
 
 if __name__ == '__main__':
-#    from open3d import *
    import time
-   dataset = ModelNetDataset(root='/home/zhao/dataset/modelnet40_normal_resampled/', npoints=2048, split='test', num_of_class=40, num_gen_samples=5,data_aug=False)
+   dataset = ModelNetDataset(root='/home/zhao/dataset/modelnet40_normal_resampled/', npoints=2048, split='test', num_of_class=40, num_gen_samples=5, data_aug=False)
    loader = torch.utils.data.DataLoader(dataset, batch_size=1, shuffle=False, num_workers=14)
    for fn in loader:
-#        print(pool1_index.shape())
        print(fn)
        print('\n')

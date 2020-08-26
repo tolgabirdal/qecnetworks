@@ -1,24 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
-Created on Tue May 21 14:37:50 2019
-"""
-
-'''
-Used for 2 layers based pooling. returen 256*9 points
-'''
-
 import os
 import os.path
 import json
 import numpy as np
 import sys
-#import provider
 import torch
 import torch.utils.data as data
 from pyquaternion import Quaternion
 from scipy.spatial import distance
-import sys
 sys.path.append('../models')
 import quat_ops
 import torch.nn.functional as F
@@ -32,7 +22,7 @@ def pc_normalize(pc):
 
 
 class ModelNetDataset(data.Dataset):
-    def __init__(self, root, batch_size=32, npoints=1024, split='train', normalize=False, num_of_class=10, num_gen_samples=20, class_choice=None, cache_size=100, data_aug=False,point_shift=False, rand_seed=999):
+    def __init__(self, root, batch_size=32, npoints=1024, split='train', normalize=False, num_of_class=10, num_gen_samples=20, class_choice=None, cache_size=100, data_aug=False, point_shift=False, rand_seed=999):
         self.root = root
         self.batch_size = batch_size
         self.npoints = npoints
@@ -45,7 +35,6 @@ class ModelNetDataset(data.Dataset):
         self.catfile = os.path.join(self.root, 'modelnet'+str(num_of_class)+'_shape_names.txt')
         self.cat = [line.rstrip() for line in open(self.catfile)]
         self.classes = dict(zip(self.cat, range(len(self.cat))))
-#        self.lrf_channel = lrf_channel
         self.rand_seed=rand_seed
 
 
@@ -61,6 +50,7 @@ class ModelNetDataset(data.Dataset):
         shape_names = ['_'.join(x.split('_')[0:-1]) for x in shape_ids[split]]
         # list of (shape_name, shape_txt_file_path) tuple
         if class_choice== None:
+            # txt: point cloud;    qua: pre-calculated LRFs;     ds: random uniform downsampled indices of points.
             self.datapath = [(shape_names[i], os.path.join(self.root, shape_names[i],
                                                            shape_ids[split][i])+'.txt', os.path.join(self.root, shape_names[i],
                                                            shape_ids[split][i])+'.qua', os.path.join(self.root, shape_names[i],
@@ -97,7 +87,6 @@ class ModelNetDataset(data.Dataset):
         self.cache = {}  # from index to (point_set, cls) tuple
 
 
-#    def _get_item(self, index):
     def __getitem__(self, index):
         if index in self.cache:
             point_normal_set, lrf_set, ds_index_set, wrong_ids, cls = self.cache[index]
@@ -108,17 +97,12 @@ class ModelNetDataset(data.Dataset):
 #            point_normal_set = np.loadtxt(fn[1]).astype(np.float32)
             point_normal_set = np.loadtxt(fn[1], delimiter=',').astype(np.float32)
             lrf_set= torch.from_numpy(np.loadtxt(fn[2]).astype(np.float32))
-
             ds_index_set= torch.load(fn[3])
 
             with warnings.catch_warnings():
                   warnings.simplefilter("ignore")
-#                  data = np.loadtxt(myfile, unpack=True)
                   wrong_ids= np.loadtxt(fn[4],ndmin=1).astype(np.long)
-#
-#        choice = np.random.choice(1, 1, replace=True)
         choice = np.random.choice(self.num_gen_samples, 1, replace=True)
-
         ds_index_set=ds_index_set[choice].squeeze()
 
         point_normal_set = torch.from_numpy(point_normal_set)
@@ -131,8 +115,8 @@ class ModelNetDataset(data.Dataset):
                 rotate_q=rotate_q*(-1)
             rotate_q=F.normalize(rotate_q, p=2, dim=-1)
             rotate_q_=rotate_q.unsqueeze(0).expand(point_set.size(0),4)
-            point_set=quat_ops.qrotv(rotate_q_, point_set)
-            lrf_set=quat_ops.qmul(rotate_q_, lrf_set)
+            point_set=quat_ops.qrotv(rotate_q_, point_set) # roate the points with the random abitrary rotation
+            lrf_set=quat_ops.qmul(rotate_q_, lrf_set)# rotate the lrfs with the random abitrary rotation
 
 
         if(self.point_shift):
@@ -142,7 +126,7 @@ class ModelNetDataset(data.Dataset):
         point_choice = np.random.choice(len(point_set), self.npoints, replace=True)
         point_set2048 = point_set[point_choice]
 
-#The index container(ds_index_set) to keep the pooling certers and neighbours, Pool1 contatiner has 1024 ceners while Pool2 has 256. The "+1" keeps the real size of the pool1 centers.
+#The index container(ds_index_set) to keep the pooling certers and neighbours, Pool1 contatiner has 1024 ceners while Pool2 has 256. 
         pool1_index=ds_index_set[0:1024]
         pool1_index0=pool1_index[0,0].clone()
         pool1_index[0,0]=-1
@@ -151,8 +135,6 @@ class ModelNetDataset(data.Dataset):
         pool2_index=pool1_index[pool2_index_,0]
         pool2_index[0,0]=pool1_index0
         pool1_size=ds_index_set[1024+256,0]
-
-#        pca_quat=ds_index_set[1024+256,5:9]
 
         activation_pool2=torch.sign(pool2_index)
         activation_pool2=torch.clamp(activation_pool2, min=0)
@@ -178,12 +160,7 @@ class ModelNetDataset(data.Dataset):
         lrf_pool2=lrf_pool2.view(256,9,4)
 
         cls = torch.from_numpy(np.array([cls]).astype(np.int64))
-#        return points_pool1[0:1024], lrf_pool1[0:1024], activation_pool1[0:1024].float(), pool2_index, cls
-        activation_pool2[0:int(pool2_size*2/3)]=0
-        points_pool2[0:int(pool2_size*2/3)]=0
-        lrf_pool2[0:int(pool2_size*2/3)]=0
         return points_pool2, lrf_pool2, activation_pool2[0:256].float(), pool2_index,point_set2048,  cls
-#        return points_pool2, lrf_pool2, activation_pool2[0:256].float(), pool2_index, cls
 
     def __len__(self):
         return len(self.datapath)
@@ -191,7 +168,6 @@ class ModelNetDataset(data.Dataset):
 
 
 if __name__ == '__main__':
-#    from open3d import *
     import time
     dataset = ModelNetDataset(root='/home/zhao/dataset/my_modelnet2', npoints=2048, split='train',point_shift=False)
     d0=dataset[0]

@@ -1,24 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
-Created on Tue May 21 14:37:50 2019
-"""
-
-'''
-Used for 2 layers based pooling. returen 256*9 points
-'''
-
 import os
 import os.path
 import json
 import numpy as np
 import sys
-#import provider
 import torch
 import torch.utils.data as data
 from pyquaternion import Quaternion
 from scipy.spatial import distance
-import sys
 sys.path.append('../models')
 import quat_ops
 import torch.nn.functional as F
@@ -43,10 +33,6 @@ class ModelNetDataset(data.Dataset):
         self.sample_pair=sample_pair
         self.catfile = os.path.join(self.root, 'modelnet'+str(num_of_class)+'_shape_names.txt')
         self.rot_id=rot_id
-#        if modelnet10:
-#            self.catfile = os.path.join(self.root, 'modelnet10_shape_names.txt')
-#        else:
-#            self.catfile = os.path.join(self.root, 'modelnet40_shape_names.txt')
         self.cat = [line.rstrip() for line in open(self.catfile)]
         self.classes = dict(zip(self.cat, range(len(self.cat))))
 #        self.lrf_channel = lrf_channel
@@ -71,8 +57,6 @@ class ModelNetDataset(data.Dataset):
 
         else:
             dir_point = os.path.join(self.root, class_choice)
-            self.rot_quat_file=os.path.join('/home/zhao/equcaps/3D-Group-Equ-Caps/eva/gt/', class_choice, 'pert_'+str(self.rot_id)+'.csvquat')
-
             fns=[]
             for file in os.listdir(dir_point):
                 if file.endswith(".txt"):
@@ -100,7 +84,6 @@ class ModelNetDataset(data.Dataset):
         self.cache = {}  # from index to (point_set, cls) tuple
 
 
-#    def _get_item(self, index):
     def __getitem__(self, index):
         if index in self.cache:
             point_normal_set, lrf_set, ds_index_set, wrong_ids, cls = self.cache[index]
@@ -108,17 +91,11 @@ class ModelNetDataset(data.Dataset):
             fn = self.datapath[index]
             cls = self.classes[self.datapath[index][0]]
             cls = np.array([cls]).astype(np.int32)
-#            point_normal_set = np.loadtxt(fn[1]).astype(np.float32)
             point_normal_set = np.loadtxt(fn[1], delimiter=',').astype(np.float32)
-
-#            lrf_set = torch.load(fn[2]).float()
             lrf_set= torch.from_numpy(np.loadtxt(fn[2]).astype(np.float32))
             ds_index_set= torch.load(fn[3])
-
-#            data_aug_rot= np.loadtxt(self.rot_quat_file, delimiter=',').astype(np.float32)
             with warnings.catch_warnings():
                   warnings.simplefilter("ignore")
-#                  data = np.loadtxt(myfile, unpack=True)
                   wrong_ids= np.loadtxt(fn[4],ndmin=1).astype(np.long)
 
             if len(self.cache) < self.cache_size:
@@ -129,19 +106,15 @@ class ModelNetDataset(data.Dataset):
 
 
         choice = np.random.choice(self.num_gen_samples, 2, replace=False)
-#        choice = np.random.choice(2, 2, replace=False) # fixed for evaluation
-#        choice =self.sample_pair
 
         points_pool2=torch.zeros(2,256,9,3)
         lrf_pool2=torch.zeros(2,256,9,4)
         activation_pool2=torch.zeros(2,256,9)
         pool2_index=torch.zeros(2,256,9)
         input_cls=torch.zeros(2,1,1).long()
-#        pca_quat2=torch.zeros(2,4).long()
 
 
         point_choice = np.random.choice(len(point_set), self.npoints, replace=False)
-#        point_set2048 = point_set[point_choice]
         point_set2048 = point_set.clone()
 
         for ds_index in range(2):
@@ -158,13 +131,10 @@ class ModelNetDataset(data.Dataset):
             pool2_index[0,0]=pool1_index0
             pool1_size=ds_index_set_[1024+256,0]
 
-#            pca_quat2[ds_index]=ds_index_set_[1024+256,5:9]
-
             activation_pool2_=torch.sign(pool2_index)
             activation_pool2_=torch.clamp(activation_pool2_, min=0)
 
             pool2_size=len((activation_pool2_[:,0]).nonzero().squeeze())
-    #        activation_pool2[pool2_size:]=0
 
             if wrong_ids.size !=0:
                 for i in range(pool2_size):
@@ -173,11 +143,8 @@ class ModelNetDataset(data.Dataset):
                             if(wrong_ids[k]==(pool2_index[i,j]).numpy()):
                                 activation_pool2_[i,j]=0
 
-
             activation_pool2[ds_index]=activation_pool2_
-
             pool2_index_=pool2_index.view(-1)
-
 
             point_set[-1]=0
 
@@ -202,36 +169,15 @@ class ModelNetDataset(data.Dataset):
             cls_ = torch.from_numpy(np.array([cls]).astype(np.int64))
             input_cls[ds_index]=cls_
 
-            # activation_pool2[:,0:int(pool2_size*2/3)]=0
-            # points_pool2[:,0:int(pool2_size*2/3)]=0
-            # lrf_pool2[:,0:int(pool2_size*2/3)]=0
-    #        return points_pool2, lrf_pool2, activation_pool2[0:256].float(), pool2_index, cls, point_set
-
         return points_pool2, lrf_pool2, activation_pool2, pool2_index, input_cls, point_set2048, rotate_q
 
     def __len__(self):
         return len(self.datapath)
 
-    def rand_ortho_rotation_matrix(self):
-        k = np.zeros((3,), dtype=int)
-        k[np.random.randint(0,3)]=1 if np.random.rand()>0.5 else -1
-        K = np.array([
-            [0, -k[2], k[1]],
-            [k[2], 0, -k[0]],
-            [-k[1], k[0], 0]
-        ])
-        all_theta = [0, 90, 180, 270]
-        theta = np.deg2rad(all_theta[np.random.randint(0,4)])
-        R = np.eye(3) + np.sin(theta)*K + (1-np.cos(theta))*np.dot(K,K)
-        return R
-
-
 
 if __name__ == '__main__':
-#    from open3d import *
     import time
     dataset = ModelNetDataset(root='/home/zhao/dataset/modelnet40_normal_resampled/',class_choice='chair', npoints=2048, split='test', sample_pair=[0,1])
-
 #    loader = torch.utils.data.DataLoader(dataset, batch_size=1, shuffle=True, num_workers=1)
     for i in range(100):
         ps = dataset[i]

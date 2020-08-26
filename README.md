@@ -65,7 +65,7 @@ To visualize the point cloud, consider installing <a href="http://www.open3d.org
 
 ### Datasets
 
-To do
+Coming soon...
 
 Generate multiple random samples and downsample:
 ```bash
@@ -75,36 +75,36 @@ Generate multiple random samples and downsample:
 
 
 
-
 ### Pre-trained model
+
+Coming soon...
 
 You can download the pre-trained models <a href="to be done" target="_blank">here</a>.
 
 
 ### Usage
 
-To do
 
-3. Train:
+3. Train the classification without rotation augmentation:
 ```bash
-  python train_cls.py
+  python train_cls.py --inter_out_channels 128 --num_iterations 3 
 ```
 		
 
-4. Train with siamese architecture:
+4. Train with siamese architecture with relative rotation loss:
 ```bash
-  python train_cls_siamese.py
+  python train_cls_sia.py --inter_out_channels 128 --num_iterations 3 
 ```
 
-5. Test Classification in catagories:
+5. Test Classification under unseen orientation:
 ```bash
-  python test_cls_in_cats.py
+  python test_cls.py --inter_out_channels 128 --num_iterations 3 
 ```
 		
-6. Test rotation estimation :
+6. Test rotation estimation with Siamese architecture:
 
 ```bash
-  python test_equ_fast.py
+  python test_rot_sia.py
 ```
 		
 		
@@ -123,11 +123,8 @@ add 3d point cpas repo
 1. Add more detials of the experiment 
 2. Add the dataset and pre-trained model with google drive link.
 3. Add more experiment
-4. refine the code, remove useless denpendencies, rename the varables corresponding to the paper.
-5. Add more comment in the code
 6. Add code reference in Readme.
 7. Add more animations
-8. Test the final version
 ...
 
 

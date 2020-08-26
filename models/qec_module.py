@@ -1,28 +1,19 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
-Created on Thu May  9 18:43:28 2019
-
-"""
-
 import torch
 import torch.nn.functional as F
 import torch_autograd_solver as S
 from torch.nn import Module, Parameter, Linear
-
 import numpy as np
 import quat_ops
-from open3d import *
-
 
 USE_CUDA=True
-class PoolingPointCapsuleLayer(Module):
+class QecModule(Module):
     def __init__(self,
                  in_channels,
                  out_channels,
                  num_iterations=3,num_neighbours=8,num_patches=8):
-        super(PoolingPointCapsuleLayer, self).__init__()
-
+        super(QecModule, self).__init__()
         self.in_channels = in_channels
         self.out_channels = out_channels
         self.num_iterations = num_iterations
@@ -40,7 +31,6 @@ class PoolingPointCapsuleLayer(Module):
     def reset_parameters(self):
         self.alpha.data.fill_(1)
         self.beta.data.fill_(1)
-#        self.c_gama.data.fill_(1)
 
     def averageQuaternions(self, _input_lrf, _input_a):
         num_q=_input_lrf.size(0)
@@ -125,11 +115,11 @@ class PoolingPointCapsuleLayer(Module):
         mean_lrf_inv=mean_lrf_inv.unsqueeze(-3).contiguous()
         mean_lrf_inv=mean_lrf_inv.expand(mean_lrf_inv.size(0), mean_lrf_inv.size(1),self.num_neighbours, mean_lrf_inv.size(3),mean_lrf_inv.size(4)).contiguous()
 
-# transform the points
+        # transform the points in to multi-canonical
         points=points.unsqueeze(-2).expand(-1,-1,-1,self.in_channels,-1)
         rotated_constant_position=quat_ops.qrotv(mean_lrf_inv, points.contiguous())
 
-# gnerate transformation matrix for dynamic routing
+        # generate transformation matrix for dynamic routing
         t_ij1=self.quater_gen1(rotated_constant_position.view(-1, self.in_channels * 3).float())
         t_ij=self.quater_gen2(t_ij1).float()
 
@@ -139,20 +129,17 @@ class PoolingPointCapsuleLayer(Module):
         # normalize the transformation(quaternions) into unit quaternion
         t_ij=F.normalize(t_ij, p=2, dim=-1)
 
-        # keep the first scalar of the quaternion positive.
         t_ij_mask = torch.sign(t_ij[:,:,:,:,:,0])
         t_ij_mask=t_ij_mask.contiguous().unsqueeze(-1).expand(-1,-1,-1,-1,-1,4)
         t_ij=t_ij*t_ij_mask
 
-# transform the input LRF with output transformations from the linear network
+        # transform the input LRF with output transformations from the linear network
         lrf = lrf[ :, :, :, None, :,:].expand_as(t_ij).contiguous()
-#        v_ij=quat_ops.qmul(t_ij, lrf)# The left product  will break the Equ
         v_ij=quat_ops.qmul(lrf,t_ij)
 
         v_ij=v_ij.transpose(-3,-4).contiguous()
         v_ij= v_ij.view(batch_size,self.num_patches,self.out_channels,self.num_neighbours*self.in_channels, 4)
 
-       # keep the first scalar of the quaternion positive.
         v_ij_mask = torch.sign(v_ij[:,:,:,:,0])
         v_ij_mask=v_ij_mask.contiguous().unsqueeze(-1).expand(-1,-1,-1,-1,4)
         v_ij=v_ij*v_ij_mask
@@ -162,7 +149,6 @@ class PoolingPointCapsuleLayer(Module):
     def mean(self, vote, b_ij,input_a):
         batch_size=vote.size(0)
         weighted_mean_lrf= self.weightedAverageQuaternions(vote, b_ij,input_a)
-
         weighted_mean_lrf=weighted_mean_lrf.view(batch_size,self.num_patches,self.out_channels,4)
         return weighted_mean_lrf
 
