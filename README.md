@@ -65,7 +65,7 @@ To visualize the point cloud, consider installing <a href="http://www.open3d.org
 
 ### Dataset preparation
 
-Follow input_prep.ipynb.
+Follow [input_prep.ipynb](input_prep.ipynb).
 
 
 
