@@ -63,15 +63,9 @@ To visualize the training process in PyTorch, consider installing  <a href="http
 
 To visualize the point cloud, consider installing <a href="http://www.open3d.org/docs/getting_started.html" target="_blank">Open3D</a>.
 
-### Datasets
+### Dataset preparation
 
-Coming soon...
-
-Generate multiple random samples and downsample:
-```bash
-  cd my_dataloader
-  python gen_downsample_index.py
-```
+Follow input_prep.ipynb.
 
 
 
